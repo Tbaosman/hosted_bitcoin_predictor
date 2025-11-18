@@ -36,9 +36,8 @@ pip install -r requirements.txt
 ### 4. Update data and run the application
 
 python update_data.py
-python app.py
 
-# after run python update_date.py
+## after run python update_date.py, the following shoud be apearded in the terminal
 #### 🚀 BITCOIN PREDICTOR - DATA UPDATE TOOL
 
 ============================================================
