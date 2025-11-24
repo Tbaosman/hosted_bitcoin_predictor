@@ -1092,3 +1092,167 @@
     margin: 15px 0;
     border-left: 4px solid #17a2b8;
 }
+
+/* Add to style.css */
+.training-section {
+    background: white;
+    border-radius: 15px;
+    padding: 25px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+    margin-bottom: 25px;
+}
+
+.training-controls {
+    display: flex;
+    gap: 15px;
+    margin: 20px 0;
+    flex-wrap: wrap;
+}
+
+.training-status {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 20px;
+    margin: 20px 0;
+    border-left: 4px solid #17A2B8;
+}
+
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+    margin-bottom: 15px;
+}
+
+.status-dot.idle { background: #6c757d; }
+.status-dot.running { background: #F7931A; animation: pulse 1.5s infinite; }
+.status-dot.success { background: #28a745; }
+.status-dot.error { background: #dc3545; }
+
+.training-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+}
+
+.metric-item {
+    background: white;
+    padding: 12px;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.metric-value {
+    font-size: 1.4em;
+    font-weight: bold;
+    color: #F7931A;
+    margin-bottom: 5px;
+}
+
+.metric-label {
+    font-size: 0.85em;
+    color: #6c757d;
+    text-transform: uppercase;
+}
+
+.training-log-container {
+    background: #1a1a1a;
+    border-radius: 10px;
+    padding: 20px;
+    margin: 20px 0;
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.training-log {
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+    line-height: 1.4;
+}
+
+.log-entry {
+    margin-bottom: 8px;
+    padding: 5px 0;
+    border-bottom: 1px solid #333;
+}
+
+.log-entry:last-child {
+    border-bottom: none;
+}
+
+.log-entry.info { color: #17A2B8; }
+.log-entry.success { color: #28a745; }
+.log-entry.warning { color: #F7931A; }
+.log-entry.error { color: #dc3545; }
+.log-entry.system { color: #6c757d; }
+
+.timestamp {
+    color: #888;
+    margin-right: 10px;
+}
+
+.training-results {
+    background: linear-gradient(135deg, #f0fff4 0%, #e8f5e9 100%);
+    border-radius: 10px;
+    padding: 20px;
+    margin: 20px 0;
+    border-left: 4px solid #28a745;
+}
+
+.results-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.result-card {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.result-value {
+    font-size: 1.3em;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 5px;
+}
+
+.result-label {
+    font-size: 0.8em;
+    color: #6c757d;
+    text-transform: uppercase;
+}
+
+/* Animation for log updates */
+@keyframes highlight {
+    0% { background-color: rgba(247, 147, 26, 0.1); }
+    100% { background-color: transparent; }
+}
+
+.log-entry.new {
+    animation: highlight 1s ease;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .training-controls {
+        flex-direction: column;
+    }
+    
+    .training-metrics {
+        grid-template-columns: 1fr;
+    }
+    
+    .results-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+    
+    .training-log-container {
+        max-height: 300px;
+    }
+}

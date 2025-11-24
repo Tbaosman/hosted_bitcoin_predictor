@@ -47,6 +47,9 @@
                 <div class="tab" onclick="switchTab('history')">
                     <i class="fas fa-history"></i> Prediction History
                 </div>
+                <div class="tab" onclick="switchTab('training')">
+                    <i class="fas fa-cogs"></i> Training
+                </div>
             </div>
             
             <!-- Dashboard Tab -->
@@ -361,6 +364,69 @@
                 </div>
             </div>
             
+            
+            <!-- Add this after the History tab content -->
+            <div id="training" class="tab-content">
+                <div class="training-section">
+                    <h2 class="chart-title"><i class="fas fa-cogs"></i> Model Training</h2>
+                    <p>Run manual model training to update Wikipedia data and retrain the prediction model.</p>
+                    
+                    <div class="training-controls">
+                        <button class="button" onclick="startTraining()" id="trainBtn">
+                            <i class="fas fa-play"></i> Start Training
+                        </button>
+                        <button class="button button-secondary" onclick="clearTrainingLog()">
+                            <i class="fas fa-trash"></i> Clear Log
+                        </button>
+                    </div>
+
+                    <!-- Training Status -->
+                    <div class="training-status" id="trainingStatus">
+                        <div class="status-indicator">
+                            <span class="status-dot idle"></span>
+                            <span id="statusText">Ready to train</span>
+                        </div>
+                        <div class="training-metrics" id="trainingMetrics">
+                            <!-- Metrics will be populated dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Real-time Training Log -->
+                    <div class="training-log-container">
+                        <h3><i class="fas fa-terminal"></i> Training Log</h3>
+                        <div class="training-log" id="trainingLog">
+                            <div class="log-entry info">
+                                <span class="timestamp">[System]</span>
+                                <span class="message">Training log ready. Click "Start Training" to begin.</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Training Results Summary -->
+                    <div class="training-results" id="trainingResults" style="display: none;">
+                        <h3><i class="fas fa-chart-line"></i> Training Results</h3>
+                        <div class="results-grid">
+                            <div class="result-card">
+                                <div class="result-label">Duration</div>
+                                <div class="result-value" id="resultDuration">--</div>
+                            </div>
+                            <div class="result-card">
+                                <div class="result-label">Features</div>
+                                <div class="result-value" id="resultFeatures">--</div>
+                            </div>
+                            <div class="result-card">
+                                <div class="result-label">Accuracy</div>
+                                <div class="result-value" id="resultAccuracy">--</div>
+                            </div>
+                            <div class="result-card">
+                                <div class="result-value" id="resultPrediction">--</div>
+                                <div class="result-label">Prediction</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Loading Indicator -->
             <div class="loading" id="loading">
                 <div class="spinner"></div>

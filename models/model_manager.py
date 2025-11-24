@@ -70,27 +70,33 @@ class ModelManager:
         if self.model is None:
             if not self.load_model():
                 return {"status": "no_model", "message": "No trained model available"}
-        
+
         # Extract backtest results from feature_info with better handling
         backtest_precision = self.feature_info.get("backtest_precision")
         backtest_accuracy = self.feature_info.get("backtest_accuracy")
-        
+
         # DEBUG: Check what we actually have
-        print(f"🔍 ModelManager: Raw backtest_precision from feature_info: {backtest_precision}")
-        print(f"🔍 ModelManager: Raw backtest_accuracy from feature_info: {backtest_accuracy}")
-        print(f"🔍 ModelManager: Type of backtest_precision: {type(backtest_precision)}")
+        print(
+            f"🔍 ModelManager: Raw backtest_precision from feature_info: {backtest_precision}"
+        )
+        print(
+            f"🔍 ModelManager: Raw backtest_accuracy from feature_info: {backtest_accuracy}"
+        )
+        print(
+            f"🔍 ModelManager: Type of backtest_precision: {type(backtest_precision)}"
+        )
         print(f"🔍 ModelManager: Type of backtest_accuracy: {type(backtest_accuracy)}")
 
         # Check if we have valid backtest data (not None and numeric)
         has_valid_backtest = (
-            backtest_precision is not None and 
-            backtest_accuracy is not None and
-            isinstance(backtest_precision, (int, float)) and
-            isinstance(backtest_accuracy, (int, float)) and
-            backtest_precision > 0 and  # Should be positive
-            backtest_accuracy > 0       # Should be positive
+            backtest_precision is not None
+            and backtest_accuracy is not None
+            and isinstance(backtest_precision, (int, float))
+            and isinstance(backtest_accuracy, (int, float))
+            and backtest_precision > 0  # Should be positive
+            and backtest_accuracy > 0  # Should be positive
         )
-        
+
         print(f"🔍 ModelManager: Has valid backtest data = {has_valid_backtest}")
 
         # Build the info dictionary
@@ -114,7 +120,7 @@ class ModelManager:
             "training_samples": self.feature_info.get("training_samples", 0),
             "training_date": self.feature_info.get("training_date", "Unknown"),
         }
-        
+
         # Only add backtest_performance if we have valid data
         if has_valid_backtest:
             info["backtest_performance"] = {
@@ -122,17 +128,25 @@ class ModelManager:
                 "accuracy": float(backtest_accuracy),
                 "quality": self._get_performance_quality(backtest_precision),
             }
-            print(f"✅ ModelManager: Added backtest_performance: precision={backtest_precision}, accuracy={backtest_accuracy}")
+            print(
+                f"✅ ModelManager: Added backtest_performance: precision={backtest_precision}, accuracy={backtest_accuracy}"
+            )
         else:
             info["backtest_performance"] = None
             print(f"❌ ModelManager: No valid backtest data available")
             if backtest_precision is None or backtest_accuracy is None:
-                print(f"❌ ModelManager: Backtest data is None - check price_predictor.py saving")
-            elif not isinstance(backtest_precision, (int, float)) or not isinstance(backtest_accuracy, (int, float)):
+                print(
+                    f"❌ ModelManager: Backtest data is None - check price_predictor.py saving"
+                )
+            elif not isinstance(backtest_precision, (int, float)) or not isinstance(
+                backtest_accuracy, (int, float)
+            ):
                 print(f"❌ ModelManager: Backtest data has wrong types")
             else:
-                print(f"❌ ModelManager: Backtest data invalid: precision={backtest_precision}, accuracy={backtest_accuracy}")
-        
+                print(
+                    f"❌ ModelManager: Backtest data invalid: precision={backtest_precision}, accuracy={backtest_accuracy}"
+                )
+
         return info
 
     def get_feature_importance(self):
@@ -164,19 +178,25 @@ class ModelManager:
                         "features": [f[0] for f in top_features],
                         "importance": [float(f[1]) for f in top_features],
                         "total_features": len(features),
-                        "categories": self._categorize_features([f[0] for f in top_features]),
+                        "categories": self._categorize_features(
+                            [f[0] for f in top_features]
+                        ),
                         "top_feature": top_features[0][0] if top_features else None,
                         # Add backtest context
                         "backtest_metrics": {
                             "precision": backtest_precision,
                             "accuracy": backtest_accuracy,
-                            "performance_quality": self._get_performance_quality(backtest_precision),
+                            "performance_quality": self._get_performance_quality(
+                                backtest_precision
+                            ),
                         }
                         if backtest_precision is not None
                         else None,
                     }
                 else:
-                    print(f"⚠️ Feature name mismatch: {len(feature_names)} names vs {len(importance_scores)} importance scores")
+                    print(
+                        f"⚠️ Feature name mismatch: {len(feature_names)} names vs {len(importance_scores)} importance scores"
+                    )
                     return self.get_sample_feature_importance()
 
             return self.get_sample_feature_importance()
@@ -196,7 +216,9 @@ class ModelManager:
                     feature_info = json.load(f)
                 if "predictors" in feature_info:
                     feature_names = feature_info["predictors"]
-                    print(f"✅ Loaded {len(feature_names)} feature names from feature_info.json")
+                    print(
+                        f"✅ Loaded {len(feature_names)} feature names from feature_info.json"
+                    )
                     return feature_names
             except Exception as e:
                 print(f"⚠️ Error loading feature info: {e}")
@@ -222,9 +244,26 @@ class ModelManager:
     def _get_default_feature_names(self):
         """Return the enhanced feature names used in the model"""
         return [
-            "close", "volume", "open", "high", "low", "edit_count", "sentiment", "neg_sentiment",
-            "close_ratio_2", "trend_2", "edit_2", "close_ratio_7", "trend_7", "edit_7",
-            "close_ratio_60", "trend_60", "edit_60", "close_ratio_365", "trend_365", "edit_365"
+            "close",
+            "volume",
+            "open",
+            "high",
+            "low",
+            "edit_count",
+            "sentiment",
+            "neg_sentiment",
+            "close_ratio_2",
+            "trend_2",
+            "edit_2",
+            "close_ratio_7",
+            "trend_7",
+            "edit_7",
+            "close_ratio_60",
+            "trend_60",
+            "edit_60",
+            "close_ratio_365",
+            "trend_365",
+            "edit_365",
         ]
 
     def _categorize_features(self, features):
@@ -234,19 +273,27 @@ class ModelManager:
         for feature in features:
             feature_lower = feature.lower()
 
-            if any(term in feature_lower for term in ["close_ratio", "price", "close", "open", "high", "low"]):
+            if any(
+                term in feature_lower
+                for term in ["close_ratio", "price", "close", "open", "high", "low"]
+            ):
                 categories["price"].append(feature)
             elif any(term in feature_lower for term in ["sentiment"]):
                 categories["sentiment"].append(feature)
             elif any(term in feature_lower for term in ["edit"]):
                 categories["wikipedia"].append(feature)
-            elif any(term in feature_lower for term in ["trend", "momentum", "volume", "rsi", "volatility"]):
+            elif any(
+                term in feature_lower
+                for term in ["trend", "momentum", "volume", "rsi", "volatility"]
+            ):
                 categories["technical"].append(feature)
             else:
                 # Default to technical for unrecognized features
                 categories["technical"].append(feature)
 
-        print(f"📊 Categorized features: Price({len(categories['price'])}), Sentiment({len(categories['sentiment'])}), Wikipedia({len(categories['wikipedia'])}), Technical({len(categories['technical'])})")
+        print(
+            f"📊 Categorized features: Price({len(categories['price'])}), Sentiment({len(categories['sentiment'])}), Wikipedia({len(categories['wikipedia'])}), Technical({len(categories['technical'])})"
+        )
         return categories
 
     def get_sample_feature_importance(self):
@@ -254,15 +301,33 @@ class ModelManager:
         print("📝 Generating sample feature importance data...")
 
         sample_features = [
-            "close_ratio_7", "sentiment", "close_ratio_60", "trend_7", "neg_sentiment",
-            "close_ratio_365", "edit_7", "trend_60", "close_ratio_2", "edit_60",
-            "trend_365", "edit_365", "trend_2", "edit_2", "close", "volume", "open", "high", "low"
+            "close_ratio_7",
+            "sentiment",
+            "close_ratio_60",
+            "trend_7",
+            "neg_sentiment",
+            "close_ratio_365",
+            "edit_7",
+            "trend_60",
+            "close_ratio_2",
+            "edit_60",
+            "trend_365",
+            "edit_365",
+            "trend_2",
+            "edit_2",
+            "close",
+            "volume",
+            "open",
+            "high",
+            "low",
         ]
 
         # Generate realistic importance scores (sum to 1)
         base_importance = np.random.dirichlet(np.ones(len(sample_features))).tolist()
         # Sort by importance
-        features_sorted = sorted(zip(sample_features, base_importance), key=lambda x: x[1], reverse=True)
+        features_sorted = sorted(
+            zip(sample_features, base_importance), key=lambda x: x[1], reverse=True
+        )
 
         features = [f[0] for f in features_sorted]
         importance = [float(f[1]) for f in features_sorted]
@@ -276,7 +341,7 @@ class ModelManager:
             "is_sample_data": True,
             "backtest_metrics": {
                 "precision": 0.5271,  # Use your actual backtest precision
-                "accuracy": 0.5106,   # Use your actual backtest accuracy
+                "accuracy": 0.5106,  # Use your actual backtest accuracy
                 "performance_quality": "moderate",
             },
         }
@@ -291,7 +356,9 @@ class ModelManager:
                 with open(self.feature_info_path, "r") as f:
                     feature_info = json.load(f)
 
-                training_date = datetime.fromisoformat(feature_info.get("training_date", "2020-01-01"))
+                training_date = datetime.fromisoformat(
+                    feature_info.get("training_date", "2020-01-01")
+                )
                 days_old = (datetime.now() - training_date).days
 
                 if days_old < 1:
@@ -321,3 +388,56 @@ class ModelManager:
             return "moderate"
         else:
             return "poor"
+
+    # Add these methods to the ModelManager class in model_manager.py
+
+    def get_training_history(self):
+        """Get training history from feature info"""
+        try:
+            if os.path.exists(self.feature_info_path):
+                with open(self.feature_info_path, "r") as f:
+                    feature_info = json.load(f)
+
+                training_history = {
+                    "last_training_date": feature_info.get("training_date", "Unknown"),
+                    "training_samples": feature_info.get("training_samples", 0),
+                    "features_count": feature_info.get("predictors", []),
+                    "backtest_precision": feature_info.get("backtest_precision"),
+                    "backtest_accuracy": feature_info.get("backtest_accuracy"),
+                    "data_date_range": feature_info.get("data_date_range", {}),
+                }
+
+                return training_history
+            else:
+                return {"error": "No training history found"}
+        except Exception as e:
+            print(f"❌ Error getting training history: {e}")
+            return {"error": str(e)}
+
+    def get_training_metrics(self):
+        """Get training performance metrics"""
+        try:
+            model_info = self.get_model_info()
+
+            if model_info.get("status") != "loaded":
+                return {"error": "Model not loaded"}
+
+            metrics = {
+                "model_type": model_info.get("model_type", "Unknown"),
+                "training_date": model_info.get("training_date", "Unknown"),
+                "feature_count": model_info.get("n_features", 0),
+                "training_samples": model_info.get("training_samples", 0),
+                "backtest_performance": model_info.get("backtest_performance"),
+                "model_freshness": self.get_model_freshness(),
+                "feature_categories": {},
+            }
+
+            # Add feature categories if available
+            feature_importance = self.get_feature_importance()
+            if "categories" in feature_importance:
+                metrics["feature_categories"] = feature_importance["categories"]
+
+            return metrics
+        except Exception as e:
+            print(f"❌ Error getting training metrics: {e}")
+            return {"error": str(e)}

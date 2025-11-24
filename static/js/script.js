@@ -1,8 +1,19 @@
-// static/js/script.js - ENHANCED BITCOIN PREDICTOR VERSION - FIXED FEATURE CATEGORIES
+// static/js/script.js - ENHANCED BITCOIN PREDICTOR VERSION WITH TRAINING TAB
 
 // Global variables for charts
 let priceChart, sentimentChart, performanceChart, featureChart, confidenceChart;
 let predictionHistory = [];
+
+// Training state management
+let trainingState = {
+    isTraining: false,
+    logEntries: [],
+    startTime: null,
+    trainingInterval: null
+};
+
+// Training polling state
+let trainingPollInterval = null;
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
@@ -42,10 +53,32 @@ function switchTab(tabName) {
         }, 100);
     } else if (tabName === 'history') {
         loadHistoryData();
+    } else if (tabName === 'training') {
+        console.log('⚙️ Switching to Training tab');
+        loadTrainingTab();
     }
     
     // Force chart resize after tab switch
     setTimeout(forceChartResize, 100);
+}
+
+// Load training tab
+function loadTrainingTab() {
+    updateTrainingControls();
+    loadTrainingHistory();
+}
+
+// Update training controls
+function updateTrainingControls() {
+    const trainBtn = document.getElementById('trainBtn');
+    const clearLogBtn = document.getElementById('clearLogBtn');
+    
+    if (trainBtn) {
+        trainBtn.onclick = startTraining;
+    }
+    if (clearLogBtn) {
+        clearLogBtn.onclick = clearTrainingLog;
+    }
 }
 
 // Force chart resize and proper rendering
@@ -103,7 +136,7 @@ function initializeCharts() {
                 padding: {
                     top: 10,
                     right: 10,
-                    bottom: 25, // Increased bottom padding for x-axis
+                    bottom: 25,
                     left: 10
                 }
             },
@@ -186,7 +219,7 @@ function initializeCharts() {
                         },
                         maxRotation: 45,
                         minRotation: 45,
-                        padding: 10 // Added padding for x-axis labels
+                        padding: 10
                     },
                     title: {
                         display: true,
@@ -213,7 +246,7 @@ function initializeCharts() {
                         font: {
                             size: 11
                         },
-                        padding: 10, // Added padding for y-axis labels
+                        padding: 10,
                         callback: function(value) {
                             if (value >= 1000000) {
                                 return '$' + (value / 1000000).toFixed(1) + 'M';
@@ -250,7 +283,7 @@ function initializeCharts() {
         }
     });
     
-    // ENHANCED Sentiment Chart - FIXED MARGINS
+    // Other chart initializations remain the same...
     const sentimentCtx = document.getElementById('sentimentChart').getContext('2d');
     sentimentChart = new Chart(sentimentCtx, {
         type: 'bar',
@@ -279,7 +312,7 @@ function initializeCharts() {
                 padding: {
                     top: 10,
                     right: 10,
-                    bottom: 25, // Increased bottom padding
+                    bottom: 25,
                     left: 10
                 }
             },
@@ -343,8 +376,6 @@ function initializeCharts() {
         }
     });
     
-    // ENHANCED Performance Chart
-   // ENHANCED Performance Chart
     const performanceCtx = document.getElementById('performanceChart').getContext('2d');
     performanceChart = new Chart(performanceCtx, {
         type: 'doughnut',
@@ -383,12 +414,9 @@ function initializeCharts() {
                     callbacks: {
                         label: function(context) {
                             const value = context.parsed;
-                            // Handle both percentage and count data
                             if (value <= 100) {
-                                // Percentage data
                                 return `${context.label}: ${value.toFixed(1)}%`;
                             } else {
-                                // Count data
                                 const total = context.dataset.data.reduce((a, b) => a + b, 0);
                                 const percentage = ((context.parsed / total) * 100).toFixed(1);
                                 return `${context.label}: ${context.parsed} (${percentage}%)`;
@@ -400,7 +428,6 @@ function initializeCharts() {
         }
     });
     
-    // ENHANCED Feature Importance Chart
     const featureCtx = document.getElementById('featureChart').getContext('2d');
     featureChart = new Chart(featureCtx, {
         type: 'bar',
@@ -472,7 +499,6 @@ function initializeCharts() {
         }
     });
     
-    // ENHANCED Confidence Distribution Chart
     const confidenceCtx = document.getElementById('confidenceChart').getContext('2d');
     confidenceChart = new Chart(confidenceCtx, {
         type: 'polarArea',
@@ -522,6 +548,544 @@ function initializeCharts() {
         }
     });
 }
+
+// =============================================================================
+// TRAINING TAB FUNCTIONALITY - UPDATED FOR CORRECT PARSING
+// =============================================================================
+
+// Start training process
+// Start training process - FIXED VERSION
+async function startTraining() {
+    if (trainingState.isTraining) {
+        showError('Training is already in progress. Please wait for it to complete.');
+        return;
+    }
+
+    const trainBtn = document.getElementById('trainBtn');
+    const statusText = document.getElementById('statusText');
+    const trainingLog = document.getElementById('trainingLog');
+    const trainingResults = document.getElementById('trainingResults');
+
+    // Reset state
+    trainingState.isTraining = true;
+    trainingState.startTime = new Date();
+    trainingState.logEntries = [];
+    
+    // Update UI
+    trainBtn.innerHTML = '<i class="fas fa-sync-alt fa-spin"></i> Training...';
+    trainBtn.disabled = true;
+    statusText.textContent = 'Training in progress...';
+    document.querySelector('.status-dot').className = 'status-dot running';
+    trainingResults.style.display = 'none';
+
+    // Clear previous log
+    trainingLog.innerHTML = '';
+    addLogEntry('system', '🚀 Starting Bitcoin predictor training pipeline...');
+
+    try {
+        console.log('🔄 Sending training request to /api/train...');
+        
+        const response = await fetch('/api/train', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+
+        console.log('📡 Response status:', response.status, response.statusText);
+
+        if (!response.ok) {
+            // Try to get more detailed error information
+            let errorMessage = `HTTP error! status: ${response.status}`;
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.message || errorData.error || errorMessage;
+            } catch (e) {
+                // If no JSON response, use status text
+                errorMessage = response.statusText || errorMessage;
+            }
+            throw new Error(errorMessage);
+        }
+
+        const data = await response.json();
+        console.log('✅ Training API response:', data);
+        
+        if (data.status === 'success') {
+            addLogEntry('success', '✅ Training process started successfully!');
+            addLogEntry('info', '🔄 Training is running in the background...');
+            addLogEntry('info', '📊 Please wait for completion (this may take a few minutes)');
+            
+            // Start polling for training progress
+            startTrainingPolling();
+            
+        } else {
+            throw new Error(data.message || 'Training failed to start');
+        }
+
+    } catch (error) {
+        console.error('❌ Training error:', error);
+        addLogEntry('error', `❌ Training failed: ${error.message}`);
+        statusText.textContent = 'Training failed';
+        document.querySelector('.status-dot').className = 'status-dot error';
+        showError(`Training failed: ${error.message}`);
+        
+        // Reset button state on error
+        trainingState.isTraining = false;
+        trainBtn.innerHTML = '<i class="fas fa-play"></i> Start Training';
+        trainBtn.disabled = false;
+    }
+}
+
+// Start polling for training progress
+// Start polling for training progress - FIXED VERSION
+function startTrainingPolling() {
+    // Clear any existing polling
+    if (trainingPollInterval) {
+        clearInterval(trainingPollInterval);
+    }
+
+    let pollCount = 0;
+    const maxPolls = 600; // 10 minutes maximum (600 * 1 second)
+
+    trainingPollInterval = setInterval(async () => {
+        pollCount++;
+        
+        if (pollCount > maxPolls) {
+            // Safety timeout
+            clearInterval(trainingPollInterval);
+            trainingState.isTraining = false;
+            const trainBtn = document.getElementById('trainBtn');
+            const statusText = document.getElementById('statusText');
+            
+            trainBtn.innerHTML = '<i class="fas fa-play"></i> Start Training';
+            trainBtn.disabled = false;
+            statusText.textContent = 'Training timeout';
+            document.querySelector('.status-dot').className = 'status-dot error';
+            addLogEntry('error', '❌ Training timed out after 10 minutes');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/training_status');
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                const trainingData = data.data;
+                const currentLog = trainingData.log || '';
+                
+                // Update the log display with new content
+                updateTrainingLog(currentLog);
+                
+                // Check if training is complete - MULTIPLE WAYS
+                const isComplete = !trainingData.is_training || 
+                                  currentLog.includes('PROCESS COMPLETED SUCCESSFULLY') ||
+                                  currentLog.includes('✅ Bitcoin model update completed successfully') ||
+                                  currentLog.includes('UPDATE SUMMARY') ||
+                                  currentLog.includes('🕐 Finished:');
+                
+                if (isComplete) {
+                    clearInterval(trainingPollInterval);
+                    trainingState.isTraining = false;
+                    
+                    // Update UI
+                    const trainBtn = document.getElementById('trainBtn');
+                    const statusText = document.getElementById('statusText');
+                    
+                    trainBtn.innerHTML = '<i class="fas fa-play"></i> Start Training';
+                    trainBtn.disabled = false;
+                    statusText.textContent = 'Training completed';
+                    document.querySelector('.status-dot').className = 'status-dot success';
+                    
+                    // Parse and display the final results
+                    parseTrainingResults(currentLog);
+                    
+                    // Show success message
+                    addLogEntry('success', '✅ Training completed successfully!');
+                    addLogEntry('info', '🔄 Refreshing dashboard data...');
+                    
+                    // Refresh dashboard data after a delay
+                    setTimeout(() => {
+                        loadDashboardData();
+                        checkStatus();
+                    }, 2000);
+                }
+            }
+        } catch (error) {
+            console.error('❌ Training polling error:', error);
+            addLogEntry('error', `❌ Polling error: ${error.message}`);
+        }
+    }, 1000); // Poll every 1 second
+}
+
+// Parse training results from log - NEW FUNCTION
+function parseTrainingResults(logText) {
+    console.log('🔍 Parsing training results from log...');
+    
+    const trainingResults = document.getElementById('trainingResults');
+    const resultDuration = document.getElementById('resultDuration');
+    const resultFeatures = document.getElementById('resultFeatures');
+    const resultAccuracy = document.getElementById('resultAccuracy');
+    const resultPrediction = document.getElementById('resultPrediction');
+
+    if (!trainingResults || !resultDuration || !resultFeatures || !resultAccuracy || !resultPrediction) {
+        console.error('❌ Missing training results elements');
+        return;
+    }
+
+    // Calculate frontend duration
+    if (trainingState.startTime) {
+        const endTime = new Date();
+        const durationMs = endTime - trainingState.startTime;
+        const durationSec = (durationMs / 1000).toFixed(1);
+        resultDuration.textContent = `${durationSec}s`;
+    }
+
+    // Extract features count - multiple patterns
+    const featuresMatch = logText.match(/Features used:\s*(\d+)/) || 
+                         logText.match(/Features:\s*(\d+)/) ||
+                         logText.match(/with\s*(\d+)\s*features/) ||
+                         logText.match(/Created\s*(\d+)\s*enhanced features/);
+    
+    if (featuresMatch) {
+        resultFeatures.textContent = featuresMatch[1];
+        console.log('✅ Found features:', featuresMatch[1]);
+    } else {
+        resultFeatures.textContent = 'Unknown';
+        console.log('❌ No features found in log');
+    }
+
+    // Extract accuracy - multiple patterns
+    const accuracyMatch = logText.match(/BACKTEST Accuracy:\s*([\d.]+)%/) || 
+                         logText.match(/Accuracy:\s*([\d.]+)%/) ||
+                         logText.match(/accuracy:\s*([\d.]+)%/i);
+    
+    if (accuracyMatch) {
+        resultAccuracy.textContent = `${accuracyMatch[1]}%`;
+        console.log('✅ Found accuracy:', accuracyMatch[1]);
+    } else {
+        resultAccuracy.textContent = 'Unknown';
+        console.log('❌ No accuracy found in log');
+    }
+
+    // Extract prediction with confidence - multiple patterns
+    const predictionMatch = logText.match(/🎯 Prediction:\s*(UP|DOWN)\s*\(Confidence:\s*([\d.]+)%\)/) ||
+                           logText.match(/Prediction:\s*(UP|DOWN)\s*\(Confidence:\s*([\d.]+)%\)/) ||
+                           logText.match(/Next day prediction:\s*(UP|DOWN)/);
+    
+    const confidenceMatch = logText.match(/Confidence:\s*([\d.]+)%/) ||
+                           logText.match(/confidence:\s*([\d.]+)%/i);
+    
+    if (predictionMatch) {
+        let predictionText = predictionMatch[1];
+        if (confidenceMatch) {
+            predictionText += ` (${confidenceMatch[1]}%)`;
+        } else if (predictionMatch[2]) {
+            predictionText += ` (${predictionMatch[2]}%)`;
+        }
+        resultPrediction.textContent = predictionText;
+        resultPrediction.className = predictionMatch[1] === 'UP' ? 'positive' : 'negative';
+        console.log('✅ Found prediction:', predictionText);
+    } else {
+        resultPrediction.textContent = 'Unknown';
+        console.log('❌ No prediction found in log');
+    }
+
+    // Show results section
+    trainingResults.style.display = 'block';
+    
+    // Debug: log what we found
+    console.log('🎯 Final parsed results:', {
+        duration: trainingState.startTime ? 'calculated' : 'unknown',
+        features: featuresMatch ? featuresMatch[1] : 'Not found',
+        accuracy: accuracyMatch ? accuracyMatch[1] : 'Not found',
+        prediction: predictionMatch ? predictionMatch[1] : 'Not found',
+        confidence: confidenceMatch ? confidenceMatch[1] : 'Not found'
+    });
+}
+
+// Update training log with new content (avoid duplicates)
+function updateTrainingLog(newLogContent) {
+    const trainingLog = document.getElementById('trainingLog');
+    const currentContent = trainingLog.textContent || '';
+    
+    // Only add new content that we haven't seen before
+    if (newLogContent.length > currentContent.length) {
+        const newContent = newLogContent.slice(currentContent.length);
+        processTrainingLog(newContent);
+    }
+}
+
+
+// Process and display training log
+function processTrainingLog(logText) {
+    const lines = logText.split('\n');
+    const trainingLog = document.getElementById('trainingLog');
+    
+    lines.forEach(line => {
+        if (line.trim()) {
+            let type = 'info';
+            let message = line.trim();
+            
+            // Enhanced log type detection
+            if (message.includes('✅') || message.includes('SUCCESS') || message.toLowerCase().includes('complete')) {
+                type = 'success';
+            } else if (message.includes('⚠️') || message.includes('WARNING') || message.toLowerCase().includes('warning')) {
+                type = 'warning';
+            } else if (message.includes('❌') || message.includes('ERROR') || message.toLowerCase().includes('error') || message.toLowerCase().includes('failed')) {
+                type = 'error';
+            } else if (message.includes('🚀') || message.includes('STARTING') || message.includes('BITCOIN PREDICTOR')) {
+                type = 'system';
+            } else if (message.includes('📊') || message.includes('WIKIPEDIA') || message.includes('SENTIMENT')) {
+                type = 'info';
+            } else if (message.includes('🎯') || message.includes('BACKTEST') || message.includes('PREDICTION')) {
+                type = 'info';
+            } else if (message.includes('=') && message.length > 50) {
+                type = 'system';
+            }
+            
+            addLogEntry(type, message);
+        }
+    });
+}
+
+// Add individual log entry
+function addLogEntry(type, message) {
+    const trainingLog = document.getElementById('trainingLog');
+    const timestamp = new Date().toLocaleTimeString();
+    
+    const logEntry = document.createElement('div');
+    logEntry.className = `log-entry ${type} new`;
+    logEntry.innerHTML = `
+        <span class="timestamp">[${timestamp}]</span>
+        <span class="message">${message}</span>
+    `;
+    
+    trainingLog.appendChild(logEntry);
+    trainingLog.scrollTop = trainingLog.scrollHeight;
+    
+    // Remove highlight class after animation
+    setTimeout(() => {
+        logEntry.classList.remove('new');
+    }, 1000);
+    
+    // Update training metrics in real-time
+    updateTrainingMetrics(message);
+}
+
+// Update training metrics based on log content
+// Update training metrics based on log content - IMPROVED VERSION
+function updateTrainingMetrics(logMessage) {
+    const metricsElement = document.getElementById('trainingMetrics');
+    
+    // Extract metrics from log messages with better regex
+    if (logMessage.includes('Fetched') && logMessage.includes('Wikipedia revisions')) {
+        const matches = logMessage.match(/Fetched\s+(\d+)\s+Wikipedia revisions/);
+        if (matches) {
+            updateMetric('wikiEdits', matches[1]);
+        }
+    }
+    
+    if (logMessage.includes('days of Bitcoin data')) {
+        const matches = logMessage.match(/(\d+)\s+days of Bitcoin data/);
+        if (matches) {
+            updateMetric('btcDays', matches[1]);
+        }
+    }
+    
+    if (logMessage.includes('features')) {
+        const matches = logMessage.match(/Created\s+(\d+)\s+enhanced features/) ||
+                       logMessage.match(/with\s+(\d+)\s+features/) ||
+                       logMessage.match(/Features:\s*(\d+)/);
+        if (matches) {
+            updateMetric('features', matches[1]);
+        }
+    }
+    
+    if (logMessage.includes('BACKTEST Precision')) {
+        const matches = logMessage.match(/BACKTEST Precision:\s*([\d.]+)%/);
+        if (matches) {
+            updateMetric('precision', matches[1] + '%');
+        }
+    }
+    
+    if (logMessage.includes('BACKTEST Accuracy')) {
+        const matches = logMessage.match(/BACKTEST Accuracy:\s*([\d.]+)%/);
+        if (matches) {
+            updateMetric('accuracy', matches[1] + '%');
+        }
+    }
+    
+    // Also update results in real-time if we detect completion indicators
+    if (logMessage.includes('UPDATE SUMMARY') || 
+        logMessage.includes('Bitcoin model update completed successfully') ||
+        logMessage.includes('🕐 Finished:')) {
+        
+        // Force update of training results
+        const trainingLog = document.getElementById('trainingLog');
+        if (trainingLog) {
+            const fullLog = trainingLog.textContent || '';
+            parseTrainingResults(fullLog);
+        }
+    }
+}
+
+// Update individual metric
+function updateMetric(metricId, value) {
+    let metricsElement = document.getElementById('trainingMetrics');
+    
+    // Create metrics container if it doesn't exist
+    if (!metricsElement.innerHTML.trim()) {
+        metricsElement.innerHTML = `
+            <div class="metric-item">
+                <div class="metric-value" id="metricWikiEdits">--</div>
+                <div class="metric-label">Wiki Edits</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-value" id="metricBtcDays">--</div>
+                <div class="metric-label">BTC Days</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-value" id="metricFeatures">--</div>
+                <div class="metric-label">Features</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-value" id="metricPrecision">--</div>
+                <div class="metric-label">Precision</div>
+            </div>
+        `;
+    }
+    
+    // Update specific metric
+    const metricMap = {
+        'wikiEdits': 'metricWikiEdits',
+        'btcDays': 'metricBtcDays',
+        'features': 'metricFeatures',
+        'precision': 'metricPrecision',
+        'accuracy': 'metricPrecision'
+    };
+    
+    if (metricMap[metricId]) {
+        const element = document.getElementById(metricMap[metricId]);
+        if (element) {
+            element.textContent = value;
+        }
+    }
+}
+
+// Update training results summary - FIXED PARSING
+function updateTrainingResults(data) {
+    const trainingResults = document.getElementById('trainingResults');
+    const resultDuration = document.getElementById('resultDuration');
+    const resultFeatures = document.getElementById('resultFeatures');
+    const resultAccuracy = document.getElementById('resultAccuracy');
+    const resultPrediction = document.getElementById('resultPrediction');
+
+    // Calculate frontend duration
+    if (trainingState.startTime) {
+        const endTime = new Date();
+        const durationMs = endTime - trainingState.startTime;
+        const durationSec = (durationMs / 1000).toFixed(1);
+        resultDuration.textContent = `${durationSec}s`;
+    }
+
+    // Parse the log text for results
+    const logText = data.log || '';
+    console.log('🔍 Parsing training log for results...');
+
+    // Extract features count - multiple patterns
+    const featuresMatch = logText.match(/Features used: (\d+)/) || 
+                         logText.match(/Features: (\d+)/) ||
+                         logText.match(/with (\d+) features/);
+    if (featuresMatch) {
+        resultFeatures.textContent = featuresMatch[1];
+        console.log('✅ Found features:', featuresMatch[1]);
+    } else {
+        resultFeatures.textContent = 'Unknown';
+        console.log('❌ No features found in log');
+    }
+
+    // Extract accuracy - multiple patterns
+    const accuracyMatch = logText.match(/BACKTEST Accuracy: ([\d.]+)%/) || 
+                         logText.match(/Accuracy: ([\d.]+)%/) ||
+                         logText.match(/accuracy: ([\d.]+)%/i);
+    if (accuracyMatch) {
+        resultAccuracy.textContent = `${accuracyMatch[1]}%`;
+        console.log('✅ Found accuracy:', accuracyMatch[1]);
+    } else {
+        resultAccuracy.textContent = 'Unknown';
+        console.log('❌ No accuracy found in log');
+    }
+
+    // Extract prediction with confidence - multiple patterns
+    const predictionMatch = logText.match(/🎯 Prediction: (UP|DOWN) \(Confidence: ([\d.]+)%\)/) ||
+                           logText.match(/Prediction: (UP|DOWN) \(Confidence: ([\d.]+)%\)/) ||
+                           logText.match(/Next day prediction: (UP|DOWN)/);
+    
+    const confidenceMatch = logText.match(/Confidence: ([\d.]+)%/) ||
+                           logText.match(/confidence: ([\d.]+)%/i);
+    
+    if (predictionMatch) {
+        let predictionText = predictionMatch[1];
+        if (confidenceMatch) {
+            predictionText += ` (${confidenceMatch[1]}%)`;
+        } else if (predictionMatch[2]) {
+            predictionText += ` (${predictionMatch[2]}%)`;
+        }
+        resultPrediction.textContent = predictionText;
+        resultPrediction.className = predictionMatch[1] === 'UP' ? 'positive' : 'negative';
+        console.log('✅ Found prediction:', predictionText);
+    } else {
+        resultPrediction.textContent = 'Unknown';
+        console.log('❌ No prediction found in log');
+    }
+
+    // Show results section
+    trainingResults.style.display = 'block';
+    
+    // Debug: log what we found
+    console.log('🎯 Final parsed results:', {
+        duration: trainingState.startTime ? 'calculated' : 'unknown',
+        features: featuresMatch ? featuresMatch[1] : 'Not found',
+        accuracy: accuracyMatch ? accuracyMatch[1] : 'Not found',
+        prediction: predictionMatch ? predictionMatch[1] : 'Not found',
+        confidence: confidenceMatch ? confidenceMatch[1] : 'Not found'
+    });
+}
+
+// Clear training log
+function clearTrainingLog() {
+    if (trainingState.isTraining) {
+        showError('Cannot clear log during training');
+        return;
+    }
+    
+    const trainingLog = document.getElementById('trainingLog');
+    trainingLog.innerHTML = `
+        <div class="log-entry info">
+            <span class="timestamp">[System]</span>
+            <span class="message">Training log cleared. Click "Start Training" to begin.</span>
+        </div>
+    `;
+    
+    const trainingResults = document.getElementById('trainingResults');
+    trainingResults.style.display = 'none';
+    
+    const metricsElement = document.getElementById('trainingMetrics');
+    metricsElement.innerHTML = '';
+    
+    const statusText = document.getElementById('statusText');
+    statusText.textContent = 'Ready to train';
+    document.querySelector('.status-dot').className = 'status-dot idle';
+}
+
+// Load training history
+function loadTrainingHistory() {
+    console.log('📚 Loading training history...');
+}
+
+// =============================================================================
+// EXISTING DASHBOARD FUNCTIONS (keep all your existing functions below)
+// =============================================================================
 
 // Load all dashboard data
 async function loadDashboardData() {
@@ -646,7 +1210,6 @@ function updatePriceIndicators(metadata) {
 }
 
 // ENHANCED: Load sentiment data from API
-// ENHANCED: Load sentiment data from API
 async function loadSentimentData() {
     try {
         console.log('📊 Loading sentiment data...');
@@ -714,7 +1277,7 @@ function loadFallbackSentimentData() {
     updateSentimentContext(fallbackData);
     sentimentChart.update();
 }
-// FIXED: Update sentiment context information - COMPLETE VERSION
+
 // FIXED: Update sentiment context information - COMPLETE VERSION
 function updateSentimentContext(sentiment) {
     console.log('📊 Updating sentiment context with:', sentiment);
@@ -772,7 +1335,6 @@ function updateSentimentContext(sentiment) {
     console.log('✅ Sentiment context updated successfully');
 }
 
-// ENHANCED: Load performance data from API
 // ENHANCED: Load performance data from API
 async function loadPerformanceData() {
     try {
@@ -1989,6 +2551,10 @@ function exportPredictionData() {
     URL.revokeObjectURL(url);
 }
 
+// =============================================================================
+// STYLES AND UTILITIES
+// =============================================================================
+
 // Add CSS for new elements
 function injectEnhancedStyles() {
     const styles = `
@@ -2104,6 +2670,170 @@ function injectEnhancedStyles() {
             margin-bottom: 10px;
             display: block;
         }
+
+        /* Training Tab Styles */
+        .training-section {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            margin-bottom: 25px;
+        }
+
+        .training-controls {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        .training-status {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 4px solid #17A2B8;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+
+        .status-dot.idle { background: #6c757d; }
+        .status-dot.running { background: #F7931A; animation: pulse 1.5s infinite; }
+        .status-dot.success { background: #28a745; }
+        .status-dot.error { background: #dc3545; }
+
+        .training-metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .metric-item {
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 1.4em;
+            font-weight: bold;
+            color: #F7931A;
+            margin-bottom: 5px;
+        }
+
+        .metric-label {
+            font-size: 0.85em;
+            color: #6c757d;
+            text-transform: uppercase;
+        }
+
+        .training-log-container {
+            background: #1a1a1a;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .training-log {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+
+        .log-entry {
+            margin-bottom: 8px;
+            padding: 5px 0;
+            border-bottom: 1px solid #333;
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .log-entry.info { color: #17A2B8; }
+        .log-entry.success { color: #28a745; }
+        .log-entry.warning { color: #F7931A; }
+        .log-entry.error { color: #dc3545; }
+        .log-entry.system { color: #6c757d; }
+
+        .timestamp {
+            color: #888;
+            margin-right: 10px;
+        }
+
+        .training-results {
+            background: linear-gradient(135deg, #f0fff4 0%, #e8f5e9 100%);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 4px solid #28a745;
+        }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .result-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .result-value {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .result-label {
+            font-size: 0.8em;
+            color: #6c757d;
+            text-transform: uppercase;
+        }
+
+        /* Animation for log updates */
+        @keyframes highlight {
+            0% { background-color: rgba(247, 147, 26, 0.1); }
+            100% { background-color: transparent; }
+        }
+
+        .log-entry.new {
+            animation: highlight 1s ease;
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .training-controls {
+                flex-direction: column;
+            }
+            
+            .training-metrics {
+                grid-template-columns: 1fr;
+            }
+            
+            .results-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+            
+            .training-log-container {
+                max-height: 300px;
+            }
+        }
     `;
     
     const styleSheet = document.createElement('style');
@@ -2111,5 +2841,11 @@ function injectEnhancedStyles() {
     document.head.appendChild(styleSheet);
 }
 
-// Uncomment the line below to debug sentiment data on page load
-// debugSentiment();
+// Add training-related functions to global scope
+window.startTraining = startTraining;
+window.clearTrainingLog = clearTrainingLog;
+window.debugSentiment = debugSentiment;
+window.exportPredictionData = exportPredictionData;
+window.getPrediction = getPrediction;
+window.updateData = updateData;
+window.switchTab = switchTab;
