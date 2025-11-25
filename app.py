@@ -63,6 +63,15 @@ class TrainingLogger:
         with self.lock:
             self.log_buffer = io.StringIO()
 
+    def mark_training_complete(self):
+        """Mark training as complete and trigger model reload"""
+        with self.lock:
+            self.is_training = False
+            # Add completion marker to log
+            self.log_buffer.write(
+                "\n🎯 TRAINING PROCESS COMPLETED - MODEL READY FOR USE\n"
+            )
+
     def start_training(self):
         """Start the training process and capture output"""
         if self.is_training:
@@ -169,7 +178,7 @@ class BitcoinPredictor:
         self.load_prediction_history()
 
     def load_model(self):
-        """Load the trained model with enhanced tracking"""
+        """Load the trained model with enhanced tracking and better error handling"""
         try:
             model_paths = [
                 "models/saved_models/bitcoin_model.pkl",
@@ -178,18 +187,36 @@ class BitcoinPredictor:
 
             for model_path in model_paths:
                 if os.path.exists(model_path):
+                    print(f"🔄 Loading model from {model_path}...")
                     with open(model_path, "rb") as f:
                         self.model = pickle.load(f)
                     print(f"✅ Model loaded successfully from {model_path}")
+
+                    # Also load the model into model_manager
                     self.model_manager.model = self.model
-                    return
+                    self.model_manager.load_model()  # This loads feature info too
+
+                    # Verify model is usable
+                    if hasattr(self.model, "predict"):
+                        print("✅ Model verification passed - predict method available")
+                    else:
+                        print("❌ Model verification failed - no predict method")
+                        self.model = None
+                        continue
+
+                    return True
 
             print("❌ No pre-trained model found. Please run the update first.")
             self.model = None
+            return False
 
         except Exception as e:
             print(f"❌ Error loading model: {e}")
+            import traceback
+
+            traceback.print_exc()
             self.model = None
+            return False
 
     def load_prediction_history(self):
         """Load prediction history from file with robust error handling"""
@@ -519,7 +546,12 @@ class BitcoinPredictor:
     def predict_tomorrow(self):
         """Make prediction for tomorrow's price movement with enhanced features"""
         if self.model is None:
-            return {"error": "Model not loaded. Please run update first."}
+            # Try to reload model first
+            print("🔄 Model not loaded, attempting to reload...")
+            if not self.reload_model():
+                return {
+                    "error": "Model not loaded. Please run training first or restart the application."
+                }
 
         if self.btc_data is None:
             success = self.get_current_data()
@@ -1263,6 +1295,26 @@ class BitcoinPredictor:
             else 0,
         }
 
+    def reload_model(self):
+        """Reload the model after training completes"""
+        print("🔄 Reloading model after training...")
+
+        # Clear current model to force reload
+        self.model = None
+        self.model_manager.model = None
+
+        # Reload the model
+        success = self.load_model()
+
+        if success:
+            print("✅ Model reloaded successfully after training")
+            # Also reload current data to ensure features are available
+            self.get_current_data()
+        else:
+            print("❌ Failed to reload model after training")
+
+        return success
+
 
 # Initialize predictor
 predictor = BitcoinPredictor()
@@ -1829,7 +1881,7 @@ def train_model():
 
 @app.route("/api/training_status", methods=["GET"])
 def get_training_status():
-    """Get current training status and log"""
+    """Get current training status and log - WITH MODEL RELOADING"""
     try:
         status = training_logger.get_status()
 
@@ -1845,7 +1897,10 @@ def get_training_status():
                     "UPDATE SUMMARY",
                 ]
             ):
-                # Training is truly complete
+                # Training is truly complete - RELOAD THE MODEL
+                print("🔄 Training complete - reloading model...")
+                reload_success = predictor.reload_model()
+
                 return jsonify(
                     {
                         "status": "success",
@@ -1856,6 +1911,7 @@ def get_training_status():
                             "training_complete": True,
                             "completion_time": datetime.now().isoformat(),
                             "message": "Training completed successfully",
+                            "model_reloaded": reload_success,
                         },
                     }
                 )
@@ -1893,6 +1949,23 @@ def get_training_log():
         )
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/force_reload_model", methods=["POST"])
+def force_reload_model():
+    """Force reload the model - for frontend use after training"""
+    try:
+        success = predictor.reload_model()
+        return jsonify(
+            {
+                "status": "success" if success else "error",
+                "message": "Model reloaded successfully"
+                if success
+                else "Failed to reload model",
+            }
+        )
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
 
 
 @app.route("/api/debug_files", methods=["GET"])

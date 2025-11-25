@@ -681,7 +681,9 @@ function startTrainingPolling() {
                                   currentLog.includes('PROCESS COMPLETED SUCCESSFULLY') ||
                                   currentLog.includes('✅ Bitcoin model update completed successfully') ||
                                   currentLog.includes('UPDATE SUMMARY') ||
-                                  currentLog.includes('🕐 Finished:');
+                                  currentLog.includes('🕐 Finished:') ||
+                                  currentLog.includes('🎯 PREDICTION RESULTS:') ||
+                                  (trainingData.training_complete === true);
                 
                 if (isComplete) {
                     clearInterval(trainingPollInterval);
@@ -699,22 +701,90 @@ function startTrainingPolling() {
                     // Parse and display the final results
                     parseTrainingResults(currentLog);
                     
-                    // Show success message
+                    // Show success message with model reload info
                     addLogEntry('success', '✅ Training completed successfully!');
-                    addLogEntry('info', '🔄 Refreshing dashboard data...');
                     
-                    // Refresh dashboard data after a delay
+                    // Check if model was reloaded successfully
+                    if (trainingData.model_reloaded === true) {
+                        addLogEntry('success', '✅ Model reloaded successfully!');
+                    } else if (trainingData.model_reloaded === false) {
+                        addLogEntry('warning', '⚠️ Model may need manual reload - trying automatic reload...');
+                    }
+                    
+                    addLogEntry('info', '🔄 Loading new model and refreshing dashboard...');
+                    
+                    // Enhanced reload sequence with better timing
                     setTimeout(() => {
-                        loadDashboardData();
-                        checkStatus();
+                        // First, force a status check to verify model is loaded
+                        checkStatus().then(() => {
+                            // Then load dashboard data
+                            loadDashboardData();
+                            
+                            // Wait a bit more and test prediction to verify everything works
+                            setTimeout(() => {
+                                addLogEntry('info', '🧪 Testing prediction with new model...');
+                                
+                                // Try to make a prediction to verify model is working
+                                getPrediction().then(() => {
+                                    addLogEntry('success', '🎯 Prediction test successful! Model is ready to use.');
+                                }).catch(error => {
+                                    addLogEntry('warning', '⚠️ Prediction test failed. Trying manual model reload...');
+                                    // If prediction fails, try to manually trigger model reload
+                                    setTimeout(() => {
+                                        fetch('/api/training_status?force_reload=true').then(() => {
+                                            addLogEntry('info', '🔄 Manual model reload triggered...');
+                                        });
+                                    }, 1000);
+                                });
+                            }, 1500);
+                        });
                     }, 2000);
                 }
             }
         } catch (error) {
             console.error('❌ Training polling error:', error);
             addLogEntry('error', `❌ Polling error: ${error.message}`);
+            
+            // If we get repeated errors, consider training failed
+            if (pollCount > 10) {
+                const errorCount = pollCount - 10;
+                if (errorCount > 5) {
+                    addLogEntry('error', '❌ Too many polling errors. Training may have failed.');
+                    clearInterval(trainingPollInterval);
+                    trainingState.isTraining = false;
+                    
+                    const trainBtn = document.getElementById('trainBtn');
+                    const statusText = document.getElementById('statusText');
+                    
+                    trainBtn.innerHTML = '<i class="fas fa-play"></i> Start Training';
+                    trainBtn.disabled = false;
+                    statusText.textContent = 'Training failed';
+                    document.querySelector('.status-dot').className = 'status-dot error';
+                }
+            }
         }
     }, 1000); // Poll every 1 second
+}
+
+// Add this helper function to handle prediction testing
+async function testPredictionAfterTraining() {
+    try {
+        showLoading('Testing new model...', 'Verifying prediction functionality...');
+        
+        const response = await fetch('/predict');
+        const data = await response.json();
+        
+        hideLoading();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        return data;
+    } catch (error) {
+        hideLoading();
+        throw error;
+    }
 }
 
 // Parse training results from log - NEW FUNCTION
@@ -2186,50 +2256,45 @@ function loadSampleHistory() {
 }
 
 // Enhanced getPrediction function with better loading states
+// Enhanced getPrediction function that returns a promise
 async function getPrediction() {
-    showLoading(
-        'Analyzing current market data...',
-        'Processing Wikipedia sentiment and technical indicators...'
-    );
-    disableButtons(true);
-    
-    try {
-        console.log('🎯 Fetching prediction from server...');
-        const response = await fetch('/predict');
-        const data = await response.json();
+    return new Promise((resolve, reject) => {
+        showLoading(
+            'Analyzing current market data...',
+            'Processing Wikipedia sentiment and technical indicators...'
+        );
+        disableButtons(true);
         
-        console.log('Prediction API response:', data);
-        
-        hideLoading();
-        disableButtons(false);
-        
-        if (data.error) {
-            console.error('❌ Prediction error from server:', data.error);
-            showError(data.error);
-            return;
-        }
-        
-        // Ensure we have all required fields
-        if (!data.prediction || data.confidence === undefined || !data.current_price) {
-            console.error('❌ Invalid prediction data received:', data);
-            showError('Invalid prediction data received from server');
-            return;
-        }
-        
-        console.log('✅ Updating display with valid prediction data');
-        updatePredictionDisplay(data);
-        checkStatus();
-        updateDataFreshness();
-        
-        // Refresh dashboard data
-        loadDashboardData();
-        
-    } catch (error) {
-        console.error('❌ Network error fetching prediction:', error);
-        hideLoading();
-        disableButtons(false);
-        showError('Failed to get prediction: ' + error.message);
-    }
+        fetch('/predict')
+            .then(response => response.json())
+            .then(data => {
+                hideLoading();
+                disableButtons(false);
+                
+                if (data.error) {
+                    console.error('❌ Prediction error from server:', data.error);
+                    showError(data.error);
+                    reject(new Error(data.error));
+                    return;
+                }
+                
+                console.log('✅ Updating display with valid prediction data');
+                updatePredictionDisplay(data);
+                checkStatus();
+                updateDataFreshness();
+                
+                // Refresh dashboard data
+                loadDashboardData();
+                resolve(data);
+            })
+            .catch(error => {
+                console.error('❌ Network error fetching prediction:', error);
+                hideLoading();
+                disableButtons(false);
+                showError('Failed to get prediction: ' + error.message);
+                reject(error);
+            });
+    });
 }
 
 async function updateData() {
@@ -2273,30 +2338,34 @@ async function updateData() {
 
 // ENHANCED: Check status with more detailed information
 async function checkStatus() {
-    try {
-        const response = await fetch('/status');
-        const data = await response.json();
-        
-        let statusHTML = `
-            Model: ${data.model_loaded ? '✅ Loaded' : '❌ Missing'}<br>
-            Data: ${data.data_loaded ? '✅ Loaded' : '❌ Missing'}<br>
-            Last Update: ${data.last_update}<br>
-            Current Time: ${data.current_time}
-        `;
-        
-        // Add system health information if available
-        if (data.system_health) {
-            const health = data.system_health;
-            statusHTML += `<br>Health: <span class="health-${health.health_status}">${health.health_status.toUpperCase()} (${health.health_score}%)</span>`;
-            statusHTML += `<br>Data Freshness: ${health.data_freshness}</div>`;
-            statusHTML += `<br>Predictions: ${health.predictions_count}`;
-        }
-        
-        document.getElementById('statusInfo').innerHTML = statusHTML;
-    } catch (error) {
-        console.error('❌ Status check failed:', error);
-        document.getElementById('statusInfo').textContent = 'Unable to check status';
-    }
+    return new Promise((resolve, reject) => {
+        fetch('/status')
+            .then(response => response.json())
+            .then(data => {
+                let statusHTML = `
+                    Model: ${data.model_loaded ? '✅ Loaded' : '❌ Missing'}<br>
+                    Data: ${data.data_loaded ? '✅ Loaded' : '❌ Missing'}<br>
+                    Last Update: ${data.last_update}<br>
+                    Current Time: ${data.current_time}
+                `;
+                
+                // Add system health information if available
+                if (data.system_health) {
+                    const health = data.system_health;
+                    statusHTML += `<br>Health: <span class="health-${health.health_status}">${health.health_status.toUpperCase()} (${health.health_score}%)</span>`;
+                    statusHTML += `<br>Data Freshness: ${health.data_freshness}</div>`;
+                    statusHTML += `<br>Predictions: ${health.predictions_count}`;
+                }
+                
+                document.getElementById('statusInfo').innerHTML = statusHTML;
+                resolve(data);
+            })
+            .catch(error => {
+                console.error('❌ Status check failed:', error);
+                document.getElementById('statusInfo').textContent = 'Unable to check status';
+                reject(error);
+            });
+    });
 }
 
 // Enhanced prediction display function
