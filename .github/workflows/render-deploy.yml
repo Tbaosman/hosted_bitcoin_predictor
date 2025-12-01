@@ -1,0 +1,40 @@
+name: Trigger Render Deployment
+
+on:
+  # Trigger when models are updated
+  push:
+    branches:
+      - main
+    paths:
+      - 'models/saved_models/**'
+      - 'wikipedia_edits.csv'
+      - 'app.py'
+      - 'requirements.txt'
+      - 'Procfile'
+  # Allow manual trigger
+  workflow_dispatch:
+
+jobs:
+  notify-render:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Notify Render to deploy
+        run: |
+          echo "✅ Code updated. Render will auto-deploy if webhook is configured."
+          echo "📝 To manually trigger Render deployment:"
+          echo "   1. Go to your Render dashboard"
+          echo "   2. Click 'Manual Deploy' on your service"
+          echo ""
+          echo "💡 Tip: Configure Render webhook for automatic deployments:"
+          echo "   Settings > Build & Deploy > Build Hook URL"
+
+      # Optional: Trigger Render deployment via webhook if you have it configured
+      # Uncomment and add your Render webhook URL as a GitHub secret
+      # - name: Trigger Render webhook
+      #   if: github.event_name == 'push'
+      #   run: |
+      #     curl -X POST "${{ secrets.RENDER_WEBHOOK_URL }}"
+
