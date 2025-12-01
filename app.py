@@ -17,6 +17,23 @@ import io
 from contextlib import redirect_stdout, redirect_stderr
 import threading
 
+
+import subprocess
+from pathlib import Path
+
+MODEL_FILE = Path("models/saved_models/bitcoin_model.pkl")
+
+# If model missing, download from GitHub Releases
+if not MODEL_FILE.exists():
+    print("Model missing — downloading latest release model...")
+    try:
+        subprocess.run(["python", "download_latest_model.py"], check=True)
+        print("Model downloaded.")
+    except Exception as e:
+        print("Failed to download model:", e)
+
+
+
 warnings.filterwarnings("ignore")
 
 app = Flask(__name__)
