@@ -48,17 +48,40 @@ def update_bitcoin_model():
             model_info = predictor.get_model_info()
             print(f"   - Features used: {model_info['predictors_count']}")
             print(f"   - Training date: {model_info['training_date']}")
-            import pickle, json
+            
+            # Verify model files exist (train_model() should have saved them)
             import os
+            import json
             os.makedirs("models/saved_models", exist_ok=True)
-
-            with open("models/saved_models/bitcoin_model.pkl", "wb") as f:
-                pickle.dump(predictor.model, f)
-
-            with open("models/saved_models/feature_info.json", "w") as f:
-                json.dump(model_info, f)
-
-            print("✅ Model and feature info saved successfully")
+            
+            model_path = "models/saved_models/bitcoin_model.pkl"
+            feature_info_path = "models/saved_models/feature_info.json"
+            
+            # Verify model file exists
+            if os.path.exists(model_path):
+                print(f"✅ Model file verified: {model_path}")
+            else:
+                print(f"⚠️  Model file not found, saving backup...")
+                import pickle
+                with open(model_path, "wb") as f:
+                    pickle.dump(predictor.model, f)
+            
+            # Verify feature_info exists with complete data
+            if os.path.exists(feature_info_path):
+                try:
+                    with open(feature_info_path, "r") as f:
+                        existing_info = json.load(f)
+                    # Check if it has all required fields
+                    if all(key in existing_info for key in ['predictors', 'training_date', 'backtest_precision', 'backtest_accuracy']):
+                        print(f"✅ Feature info file verified with complete data")
+                    else:
+                        print(f"⚠️  Feature info incomplete, but keeping existing structure")
+                except Exception as e:
+                    print(f"⚠️  Error reading feature_info: {e}")
+            else:
+                print(f"⚠️  Feature info file not found")
+            
+            print("✅ Model and feature info verification complete")
             return prediction
         else:
             error_msg = prediction.get('error', 'Unknown error') if prediction else 'No prediction returned'
