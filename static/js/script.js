@@ -837,6 +837,18 @@ function parseTrainingResults(logText) {
         console.log('❌ No accuracy found in log');
     }
 
+    // Extract precision - multiple patterns (changed from accuracy)
+    const precisionMatch = logText.match(/BACKTEST Precision:\s*([\d.]+)%/) || 
+                        logText.match(/Precision:\s*([\d.]+)%/) ||
+                        logText.match(/precision:\s*([\d.]+)%/i);
+
+    if (precisionMatch) {
+        resultAccuracy.textContent = `${precisionMatch[1]}%`;
+        console.log('✅ Found precision:', precisionMatch[1]);
+    } else {
+        resultAccuracy.textContent = 'Unknown';
+        console.log('❌ No precision found in log');
+    }
     // Extract prediction with confidence - multiple patterns
     const predictionMatch = logText.match(/🎯 Prediction:\s*(UP|DOWN)\s*\(Confidence:\s*([\d.]+)%\)/) ||
                            logText.match(/Prediction:\s*(UP|DOWN)\s*\(Confidence:\s*([\d.]+)%\)/) ||
@@ -1417,10 +1429,10 @@ async function loadPerformanceData() {
             // FIXED: Update performance chart for backtest data
             if (performance.data_source === 'backtesting' || performance.data_source === 'backtesting_fallback') {
                 // Use backtest accuracy for the chart
-                const accuracy = performance.accuracy / 100; // Convert percentage to decimal
+                const precision = performance.precision / 100; // Convert percentage to decimal
                 performanceChart.data.datasets[0].data = [
-                    accuracy * 100,  // Correct predictions (as percentage)
-                    (1 - accuracy) * 100  // Incorrect predictions (as percentage)
+                    precision * 100,  // Correct predictions (as percentage)
+                    (1 - precision) * 100  // Incorrect predictions (as percentage)
                 ];
             } else {
                 // Use historical prediction data (original logic)
@@ -1433,18 +1445,17 @@ async function loadPerformanceData() {
             performanceChart.update();
             
             // Update stats cards with enhanced information
-            document.getElementById('accuracyStat').textContent = `${Math.round(performance.accuracy)}%`;
-            document.getElementById('upAccuracy').textContent = `${Math.round(performance.up_accuracy)}%`;
-            document.getElementById('downAccuracy').textContent = `${Math.round(performance.down_accuracy)}%`;
-            document.getElementById('avgConfidence').textContent = `${Math.round(performance.avg_confidence)}%`;
-            
+            document.getElementById('precisionStat').textContent = `${parseFloat(performance.precision).toFixed(2)}%`;
+            document.getElementById('upAccuracy').textContent = `${parseFloat(performance.up_accuracy).toFixed(2)}%`;
+            document.getElementById('downAccuracy').textContent = `${parseFloat(performance.down_accuracy).toFixed(2)}%`;
+            document.getElementById('avgConfidence').textContent = `${parseFloat(performance.avg_confidence).toFixed(2)}%`;
             // Update performance context
             updatePerformanceContext(performance);
         }
     } catch (error) {
         console.error('❌ Error loading performance data:', error);
         // Fallback to sample data
-        document.getElementById('accuracyStat').textContent = '65%';
+        document.getElementById('precisionStat').textContent = '65%';
         document.getElementById('upAccuracy').textContent = '68%';
         document.getElementById('downAccuracy').textContent = '62%';
         document.getElementById('avgConfidence').textContent = '71%';
@@ -1477,7 +1488,7 @@ function updatePerformanceContext(performance) {
     }
     
     if (improvementElement && performance.precision) {
-        const improvement = (performance.precision - 50).toFixed(1);
+        const improvement = (parseFloat(performance.precision) - 50).toFixed(2);
         improvementElement.textContent = `+${improvement}%`;
         if (improvementScoreElement) {
             improvementScoreElement.textContent = `+${improvement}%`;

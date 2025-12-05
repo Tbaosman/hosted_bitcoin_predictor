@@ -1256,3 +1256,11 @@
         max-height: 300px;
     }
 }
+
+.precision-stat {
+    border-left: 4px solid #17A2B8 !important;
+}
+
+.precision-stat .stat-value {
+    color: #17A2B8 !important;
+}
