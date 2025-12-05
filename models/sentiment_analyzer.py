@@ -44,7 +44,7 @@ class WikipediaSentimentAnalyzer:
             start_date_str = '2010-01-01T00:00:00Z'
         """
         print("📥 Fetching complete Wikipedia Bitcoin page history...")
-            start_date_str = '2014-01-01T00:00:00Z'
+        start_date_str = '2014-01-01T00:00:00Z'
         try:
             site = mwclient.Site("en.wikipedia.org")
             site.rate_limit_wait = True
