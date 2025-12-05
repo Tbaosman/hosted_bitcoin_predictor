@@ -83,13 +83,12 @@ jobs:
           if git diff --staged --quiet; then
             echo "No changes to commit."
           else
-            # Commit the changes
-            git commit -m "🤖 Auto-update: Retrain models and update data [skip ci]"
+            # Commit the changes using --no-edit to prevent interactive editor
+            git commit -m "🤖 Auto-update: Retrain models and update data [skip ci]" --no-edit
             
-            # PULL & MERGE: Pull the latest changes from origin/main using a merge strategy.
-            # This is the crucial change: standard 'git pull' defaults to a merge, 
-            # which can resolve conflicts non-interactively and prevent the rebase failure.
-            git pull origin main
+            # PULL & MERGE: Explicitly force a merge strategy (not rebase)
+            # This is the most reliable way to handle conflicts non-interactively.
+            git pull --no-rebase origin main
             
             # Push the resulting commit (or merge commit)
             git push
