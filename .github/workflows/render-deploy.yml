@@ -17,6 +17,8 @@ on:
 jobs:
   notify-render:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -30,6 +32,31 @@ jobs:
           echo ""
           echo "💡 Tip: Configure Render webhook for automatic deployments:"
           echo "   Settings > Build & Deploy > Build Hook URL"
+          
+      - name: Generate and Commit JSON Data
+        run: |
+          # WARNING: This runs app.py. Ensure it generates the file and exits quickly, 
+          # otherwise this step will time out.
+          python app.py
+          
+          if [ -f "prediction_history.json" ]; then
+            git config --local user.email "action@github.com"
+            git config --local user.name "GitHub Action"
+            
+            git add prediction_history.json
+            
+            # Check if there are changes to commit (the new JSON file)
+            if git diff --staged --quiet; then
+                git commit -m "🤖 Auto-update: Generate dashboard_data.json [skip ci]" 
+                # [skip ci] is crucial to prevent this commit from re-triggering this workflow!
+                git pull --rebase origin main
+                git push
+            else
+                echo "JSON file was generated but content did not change."
+            fi
+          else
+            echo "❌ JSON file (prediction_history.json) was not created by app.py."
+          fi
 
       # Optional: Trigger Render deployment via webhook if you have it configured
       # Uncomment and add your Render webhook URL as a GitHub secret
