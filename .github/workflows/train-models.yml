@@ -17,12 +17,14 @@ jobs:
   train-models:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    permissions:
+      contents: write  # Add this to grant write permissions
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           fetch-depth: 0
 
       - name: Set up Python
@@ -102,5 +104,5 @@ jobs:
           tag: ${{ env.RELEASE_TAG }}
           name: "Bitcoin Model Release"
           allowUpdates: true
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
           assets: "models/saved_models/*.pkl,models/saved_models/*.json"
